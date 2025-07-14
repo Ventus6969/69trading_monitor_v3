@@ -1,0 +1,249 @@
+/* 69交易機器人監控系統樣式 */
+
+body {
+    background-color: #f8f9fa;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* 導航欄 */
+.navbar-brand {
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+/* 卡片樣式 */
+.card {
+    border: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border-radius: 8px;
+}
+
+.card-header {
+    background-color: #fff;
+    border-bottom: 1px solid #dee2e6;
+    font-weight: 600;
+}
+
+/* 統計卡片 */
+.card.bg-primary,
+.card.bg-info,
+.card.bg-success,
+.card.bg-warning,
+.card.bg-danger {
+    border-radius: 10px;
+}
+
+.card.bg-primary .card-body,
+.card.bg-info .card-body,
+.card.bg-success .card-body,
+.card.bg-warning .card-body,
+.card.bg-danger .card-body {
+    padding: 1rem;
+}
+
+.card.bg-primary h4,
+.card.bg-info h4,
+.card.bg-success h4,
+.card.bg-warning h4,
+.card.bg-danger h4 {
+    margin-bottom: 0.5rem;
+    font-size: 2rem;
+    font-weight: bold;
+}
+
+/* 表格樣式 */
+.table {
+    margin-bottom: 0;
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    font-size: 0.875rem;
+    vertical-align: middle;
+}
+
+.table td {
+    vertical-align: middle;
+    font-size: 0.875rem;
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(0,0,0,0.03);
+}
+
+/* 徽章樣式 */
+.badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+
+/* 按鈕樣式 */
+.btn {
+    border-radius: 6px;
+    font-weight: 500;
+}
+
+.btn-sm {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.8rem;
+}
+
+/* 警告框樣式 */
+.alert {
+    border: none;
+    border-radius: 8px;
+}
+
+.alert-info {
+    background-color: #e3f2fd;
+    color: #1565c0;
+}
+
+.alert-danger {
+    background-color: #ffebee;
+    color: #c62828;
+}
+
+/* 響應式調整 */
+@media (max-width: 768px) {
+    .container-fluid {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+    
+    .card-body {
+        padding: 1rem 0.75rem;
+    }
+    
+    .table-responsive {
+        font-size: 0.8rem;
+    }
+    
+    .table th,
+    .table td {
+        padding: 0.5rem 0.25rem;
+    }
+    
+    /* 統計卡片在手機上的調整 */
+    .card.bg-primary h4,
+    .card.bg-info h4,
+    .card.bg-success h4,
+    .card.bg-warning h4,
+    .card.bg-danger h4 {
+        font-size: 1.5rem;
+    }
+}
+
+/* 狀態指示器 */
+.status-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 0.5rem;
+}
+
+.status-indicator.success {
+    background-color: #28a745;
+}
+
+.status-indicator.warning {
+    background-color: #ffc107;
+}
+
+.status-indicator.danger {
+    background-color: #dc3545;
+}
+
+/* 特殊文字樣式 */
+.text-success {
+    color: #28a745 !important;
+}
+
+.text-danger {
+    color: #dc3545 !important;
+}
+
+.text-warning {
+    color: #ffc107 !important;
+}
+
+.text-muted {
+    color: #6c757d !important;
+}
+
+/* 動畫效果 */
+.card {
+    transition: transform 0.2s ease-in-out;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+}
+
+.btn {
+    transition: all 0.2s ease-in-out;
+}
+
+/* 特殊樣式 */
+.prediction-accuracy {
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.ml-confidence {
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+}
+
+/* 數據表格專用樣式 */
+.trading-table {
+    font-size: 0.85rem;
+}
+
+.trading-table .badge {
+    font-size: 0.7rem;
+}
+
+.trading-table small {
+    font-size: 0.75rem;
+    color: #666;
+}
+
+/* 載入動畫 */
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.spinner-border-sm {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* 自定義工具提示 */
+.tooltip-inner {
+    max-width: 300px;
+    font-size: 0.8rem;
+}
+
+/* 手機端表格優化 */
+@media (max-width: 576px) {
+    .table-responsive table {
+        font-size: 0.7rem;
+    }
+    
+    .table-responsive .badge {
+        font-size: 0.6rem;
+        padding: 0.2rem 0.4rem;
+    }
+    
+    .navbar-brand {
+        font-size: 0.9rem;
+    }
+    
+    .navbar-text {
+        font-size: 0.8rem;
+    }
+}

@@ -1,0 +1,41 @@
+# 監控主機依賴包列表
+# Flask Web框架
+Flask==2.3.3
+Jinja2==3.1.2
+
+# 數據庫操作 (sqlite3是Python內建模組，不需要安裝)
+
+# HTTP請求
+requests==2.31.0
+
+# 配置管理
+python-dotenv==1.0.0
+
+# 時間處理
+pytz==2023.3
+
+# 系統監控
+psutil==5.9.5
+
+# 日誌處理
+colorlog==6.7.0
+
+# 數據分析 (用於統計和可視化)
+pandas==2.0.3
+numpy==1.24.3
+
+# 圖表生成 (可選，用於高級可視化)
+matplotlib==3.7.2
+plotly==5.15.0
+
+# SSH相關 (用於同步)
+paramiko==3.3.1
+
+# 文件監控 (用於智能同步)
+watchdog==3.0.0
+
+# JSON處理增強
+ujson==5.8.0
+
+# 壓縮處理 (用於優化同步)
+lz4==4.3.2
