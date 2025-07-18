@@ -175,7 +175,7 @@ def get_basic_stats_simple():
         return get_empty_stats()
 
 def get_recent_signals_simple(limit=5):
-    """獲取最近的信號 - 簡化版"""
+    """獲取最近的信號 - 只顯示主要交易結果"""
     try:
         if not os.path.exists(DB_PATH):
             return []
@@ -183,12 +183,25 @@ def get_recent_signals_simple(limit=5):
         with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
             
+            # 修改查詢：只取主訂單，並優先顯示交易結果
             cursor.execute("""
-                SELECT sr.id, sr.signal_type, sr.symbol, sr.side, 
-                       sr.timestamp, oe.status as order_status,
-                       tr.final_pnl, tr.is_successful
+                SELECT 
+                    sr.id, 
+                    sr.signal_type, 
+                    sr.symbol, 
+                    sr.side, 
+                    sr.timestamp,
+                    CASE 
+                        WHEN tr.exit_method IS NOT NULL THEN tr.exit_method
+                        WHEN oe.status IS NOT NULL THEN oe.status
+                        ELSE 'PENDING'
+                    END as final_status,
+                    COALESCE(tr.final_pnl, 0) as final_pnl,
+                    tr.is_successful
                 FROM signals_received sr
-                LEFT JOIN orders_executed oe ON sr.id = oe.signal_id
+                LEFT JOIN orders_executed oe ON sr.id = oe.signal_id 
+                    AND oe.client_order_id NOT LIKE '%T'  -- 排除止盈單
+                    AND oe.client_order_id NOT LIKE '%S'  -- 排除止損單
                 LEFT JOIN trading_results tr ON oe.id = tr.order_id
                 ORDER BY sr.timestamp DESC
                 LIMIT ?
@@ -196,7 +209,7 @@ def get_recent_signals_simple(limit=5):
             
             results = []
             for row in cursor.fetchall():
-                signal_id, signal_type, symbol, side, timestamp, order_status, final_pnl, is_successful = row
+                signal_id, signal_type, symbol, side, timestamp, final_status, final_pnl, is_successful = row
                 
                 # 轉換時間戳
                 try:
@@ -205,15 +218,33 @@ def get_recent_signals_simple(limit=5):
                 except:
                     formatted_time = str(timestamp)
                 
+                # 轉換狀態顯示 - 保持原有的TP/SL顯示
+                if final_status == 'TAKE_PROFIT':
+                    display_status = 'TP_FILLED'
+                    result_icon = '✅'
+                elif final_status == 'STOP_LOSS':
+                    display_status = 'SL_FILLED' 
+                    result_icon = '❌'
+                elif final_status == 'FILLED':
+                    display_status = 'FILLED'
+                    result_icon = '✅' if is_successful else '❌'
+                elif final_status == 'CANCELED':
+                    display_status = 'CANCELED'
+                    result_icon = '⏸️'
+                else:
+                    display_status = final_status
+                    result_icon = '🔄'
+                
                 results.append({
                     'id': signal_id,
                     'signal_type': signal_type,
                     'symbol': symbol,
                     'side': side,
                     'timestamp': formatted_time,
-                    'order_status': order_status or 'N/A',
+                    'order_status': display_status,
                     'final_pnl': final_pnl,
-                    'is_successful': is_successful
+                    'is_successful': is_successful,
+                    'result_icon': result_icon
                 })
                 
             return results
@@ -221,7 +252,7 @@ def get_recent_signals_simple(limit=5):
     except Exception as e:
         logger.error(f"最近信號獲取錯誤: {str(e)}")
         return []
-
+    
 def get_empty_stats():
     """返回空統計數據"""
     return {
