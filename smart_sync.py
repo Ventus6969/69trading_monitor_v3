@@ -62,15 +62,22 @@ def get_remote_db_info():
         logger.error(f"獲取遠程數據庫信息失敗: {str(e)}")
         return 0, 0
 
-def sync_database():
-    """同步數據庫"""
+def sync_from_remote():
+    """
+    🔥 主要同步函數 - 供app.py調用
+    從遠程同步數據庫到本地
+    """
     try:
         # 確保本地目錄存在
         os.makedirs(os.path.dirname(LOCAL_DB_PATH), exist_ok=True)
         
         # 檢查遠程數據庫
         if not check_remote_db_exists():
-            return {'status': 'error', 'message': f'遠程數據庫不存在: {REMOTE_DB_PATH}'}
+            return {
+                'success': False, 
+                'message': f'遠程數據庫不存在: {REMOTE_DB_PATH}',
+                'error': 'Remote database not found'
+            }
         
         # 獲取遠程信息
         remote_size, remote_mtime = get_remote_db_info()
@@ -81,19 +88,26 @@ def sync_database():
         sync_reason = "初始同步"
         
         if os.path.exists(SYNC_STATE_FILE):
-            with open(SYNC_STATE_FILE, 'r') as f:
-                sync_state = json.load(f)
+            try:
+                with open(SYNC_STATE_FILE, 'r') as f:
+                    sync_state = json.load(f)
+                    
+                last_size = sync_state.get('last_size', 0)
+                last_mtime = sync_state.get('last_mtime', 0)
                 
-            last_size = sync_state.get('last_size', 0)
-            last_mtime = sync_state.get('last_mtime', 0)
-            
-            if remote_size == last_size and remote_mtime == last_mtime:
-                need_sync = False
-                sync_reason = "數據無變化"
+                if remote_size == last_size and remote_mtime == last_mtime:
+                    need_sync = False
+                    sync_reason = "數據無變化"
+            except Exception as e:
+                logger.warning(f"讀取同步狀態失敗: {str(e)}")
         
         if not need_sync:
             logger.info(f"🔍 {sync_reason}，跳過同步")
-            return {'status': 'skipped', 'message': sync_reason}
+            return {
+                'success': True,
+                'message': sync_reason,
+                'sync_performed': False
+            }
         
         # 執行同步
         logger.info(f"🔄 開始同步: {sync_reason}")
@@ -114,7 +128,7 @@ def sync_database():
                 'last_sync_time': datetime.now().isoformat(),
                 'last_size': remote_size,
                 'last_mtime': remote_mtime,
-                'sync_count': sync_state.get('sync_count', 0) + 1 if os.path.exists(SYNC_STATE_FILE) else 1
+                'sync_count': sync_state.get('sync_count', 0) + 1 if 'sync_state' in locals() else 1
             }
             
             with open(SYNC_STATE_FILE, 'w') as f:
@@ -128,18 +142,45 @@ def sync_database():
             record_count = check_database_records()
             
             return {
-                'status': 'success',
+                'success': True,
                 'message': f'同步成功，數據庫大小: {local_size} bytes，記錄數: {record_count}',
+                'sync_performed': True,
                 'records': record_count,
-                'size_bytes': local_size
+                'size_bytes': local_size,
+                'sync_time': sync_state['last_sync_time']
             }
         else:
             logger.error(f"❌ SCP同步失敗: {result.stderr}")
-            return {'status': 'error', 'message': f'同步失敗: {result.stderr}'}
+            return {
+                'success': False,
+                'message': f'同步失敗: {result.stderr}',
+                'error': result.stderr
+            }
             
     except Exception as e:
         logger.error(f"同步過程出錯: {str(e)}")
-        return {'status': 'error', 'message': str(e)}
+        return {
+            'success': False,
+            'message': f'同步異常: {str(e)}',
+            'error': str(e)
+        }
+
+def sync_database():
+    """同步數據庫 - 向後相容函數"""
+    result = sync_from_remote()
+    
+    # 轉換為舊格式
+    if result['success']:
+        return {
+            'status': 'success' if result.get('sync_performed', True) else 'skipped',
+            'message': result['message'],
+            'records': result.get('records', 0)
+        }
+    else:
+        return {
+            'status': 'error',
+            'message': result['message']
+        }
 
 def check_database_records():
     """檢查數據庫記錄數"""
@@ -168,6 +209,35 @@ def check_database_records():
         logger.error(f"檢查數據庫記錄失敗: {str(e)}")
         return 0
 
+def get_sync_status():
+    """獲取同步狀態"""
+    try:
+        if os.path.exists(SYNC_STATE_FILE):
+            with open(SYNC_STATE_FILE, 'r') as f:
+                sync_state = json.load(f)
+                
+            return {
+                'last_sync_time': sync_state.get('last_sync_time', '無'),
+                'sync_count': sync_state.get('sync_count', 0),
+                'last_size': sync_state.get('last_size', 0),
+                'status': 'ok'
+            }
+        else:
+            return {
+                'last_sync_time': '尚未同步',
+                'sync_count': 0,
+                'last_size': 0,
+                'status': 'never_synced'
+            }
+    except Exception as e:
+        return {
+            'last_sync_time': '錯誤',
+            'sync_count': 0,
+            'last_size': 0,
+            'status': 'error',
+            'error': str(e)
+        }
+
 def main():
     """主程式"""
     import sys
@@ -175,13 +245,10 @@ def main():
     if len(sys.argv) > 1:
         if sys.argv[1] == '--status':
             # 顯示同步狀態
-            if os.path.exists(SYNC_STATE_FILE):
-                with open(SYNC_STATE_FILE, 'r') as f:
-                    sync_state = json.load(f)
-                print(f"📊 最後同步: {sync_state.get('last_sync_time', '無')}")
-                print(f"📊 同步次數: {sync_state.get('sync_count', 0)}")
-            else:
-                print("📊 尚未進行過同步")
+            status = get_sync_status()
+            print(f"📊 最後同步: {status['last_sync_time']}")
+            print(f"📊 同步次數: {status['sync_count']}")
+            print(f"📊 數據庫大小: {status['last_size']} bytes")
             
             # 檢查遠程狀態
             if check_remote_db_exists():
@@ -198,10 +265,10 @@ def main():
             print("🔄 強制同步模式")
     
     # 執行同步
-    result = sync_database()
+    result = sync_from_remote()
     print(f"📊 同步結果: {result['message']}")
     
-    if result['status'] == 'success':
+    if result['success']:
         print(f"✅ 同步完成，共 {result.get('records', 0)} 筆記錄")
 
 if __name__ == '__main__':
