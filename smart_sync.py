@@ -64,7 +64,7 @@ def get_remote_db_info():
 
 def sync_from_remote():
     """
-    🔥 主要同步函數 - 供app.py調用
+    🔥 主要同步函數 - v3.2.1 修復版本 (時間戳容忍度調整)
     從遠程同步數據庫到本地
     """
     try:
@@ -83,7 +83,7 @@ def sync_from_remote():
         remote_size, remote_mtime = get_remote_db_info()
         logger.info(f"遠程數據庫: {remote_size} bytes, 修改時間: {datetime.fromtimestamp(remote_mtime)}")
         
-        # 檢查是否需要同步
+        # 🔥 修復：調整同步判斷邏輯，增加容忍度
         need_sync = True
         sync_reason = "初始同步"
         
@@ -95,14 +95,34 @@ def sync_from_remote():
                 last_size = sync_state.get('last_size', 0)
                 last_mtime = sync_state.get('last_mtime', 0)
                 
-                if remote_size == last_size and remote_mtime == last_mtime:
+                # 🔥 新增：設定容忍度
+                size_tolerance = 2048      # 2KB大小容忍度
+                time_tolerance = 600       # 10分鐘時間容忍度 (600秒)
+                
+                size_diff = abs(remote_size - last_size)
+                time_diff = abs(remote_mtime - last_mtime)
+                
+                logger.info(f"🔍 同步檢查:")
+                logger.info(f"   大小差異: {size_diff} bytes (容忍度: {size_tolerance} bytes)")
+                logger.info(f"   時間差異: {time_diff} 秒 (容忍度: {time_tolerance} 秒)")
+                
+                # 🔥 修復：使用容忍度判斷是否需要同步
+                if size_diff <= size_tolerance and time_diff <= time_tolerance:
                     need_sync = False
-                    sync_reason = "數據無變化"
+                    sync_reason = "數據無顯著變化"
+                    logger.info(f"✅ {sync_reason}，跳過同步")
+                else:
+                    if size_diff > size_tolerance:
+                        sync_reason = f"檔案大小變化: {size_diff} bytes"
+                    else:
+                        sync_reason = f"修改時間變化: {time_diff} 秒"
+                    logger.info(f"🔄 需要同步: {sync_reason}")
+                    
             except Exception as e:
                 logger.warning(f"讀取同步狀態失敗: {str(e)}")
+                sync_reason = "狀態文件錯誤，強制同步"
         
         if not need_sync:
-            logger.info(f"🔍 {sync_reason}，跳過同步")
             return {
                 'success': True,
                 'message': sync_reason,
@@ -112,6 +132,17 @@ def sync_from_remote():
         # 執行同步
         logger.info(f"🔄 開始同步: {sync_reason}")
         
+        # 備份現有數據庫（如果存在）
+        if os.path.exists(LOCAL_DB_PATH):
+            backup_path = f"{LOCAL_DB_PATH}.backup.{int(datetime.now().timestamp())}"
+            try:
+                import shutil
+                shutil.copy2(LOCAL_DB_PATH, backup_path)
+                logger.info(f"📦 已備份現有數據庫: {backup_path}")
+            except Exception as e:
+                logger.warning(f"備份失敗: {str(e)}")
+        
+        # 執行SCP同步
         sync_cmd = [
             'scp', '-i', SSH_KEY_PATH,
             '-o', 'ConnectTimeout=10',
@@ -120,15 +151,18 @@ def sync_from_remote():
             LOCAL_DB_PATH
         ]
         
+        logger.info("📡 執行SCP同步...")
         result = subprocess.run(sync_cmd, capture_output=True, text=True, timeout=30)
         
         if result.returncode == 0:
-            # 更新同步狀態
+            # 🔥 更新同步狀態
             sync_state = {
                 'last_sync_time': datetime.now().isoformat(),
                 'last_size': remote_size,
                 'last_mtime': remote_mtime,
-                'sync_count': sync_state.get('sync_count', 0) + 1 if 'sync_state' in locals() else 1
+                'sync_count': sync_state.get('sync_count', 0) + 1 if 'sync_state' in locals() else 1,
+                'sync_reason': sync_reason,
+                'version': 'v3.2.1'  # 版本標記
             }
             
             with open(SYNC_STATE_FILE, 'w') as f:
@@ -147,7 +181,8 @@ def sync_from_remote():
                 'sync_performed': True,
                 'records': record_count,
                 'size_bytes': local_size,
-                'sync_time': sync_state['last_sync_time']
+                'sync_time': sync_state['last_sync_time'],
+                'sync_reason': sync_reason
             }
         else:
             logger.error(f"❌ SCP同步失敗: {result.stderr}")
@@ -157,6 +192,13 @@ def sync_from_remote():
                 'error': result.stderr
             }
             
+    except subprocess.TimeoutExpired:
+        logger.error("❌ 同步超時")
+        return {
+            'success': False,
+            'message': '同步超時',
+            'error': 'Sync timeout'
+        }
     except Exception as e:
         logger.error(f"同步過程出錯: {str(e)}")
         return {
